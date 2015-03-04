@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta http-equiv="content-type" content="text/html; charset=utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+  <meta http-equiv="X-UA-Compatible" content="IE=Edge">
+  <title>SeqViewer</title>
+  <script>
+  // ---------------- Grobal Settings ---------------------
+  var DEFAULT_BGIMG = 'test/output/グループ 1.jpg';
+  var FILENAME_RGEX = '(test/output/グループ )(\\d{1})(.jpg)';
+  var PREVIOUS_FRAME_OPACITY = 0.76; //前フレーム透過時の前フレームの透明度    
+  // ------------------------------------------------------
+  </script>
+  <!--  以降は変更する必要はありません-->
+  <style>
+body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  position: absolute;
+  font-family: 'Source Sans Pro',"游ゴシック","YuGothic",sans-serif;
+}
+h1, h2, h3, h4 {
+  font-weight: normal;
+  margin: 0;
+  margin-bottom: .3em;
+  padding: 0;
+}
+#shortcut {
+  width: 8em;
+  height: .5em;
+  padding: 1em 1em;
+  background-color: rgba(255, 255, 255, 0.76);
+  z-index: 100;
+  position: relative;
+  overflow: hidden;
+  cursor: pointer;
+  /* delay 0 not works (s is needed)*/
+  transition: height .17s linear 0s;
+}
+#shortcut:focus {
+  height: 25em;
+}
+#page-counter {
+  font-size: 1.8em;
+  font-weight: 100;
+  z-index: 100;
+  position: absolute;
+  right: 1em;
+  bottom: .6em;
+}
+#view {
+  width: 100%;
+  height: 100%;
+  background-image: url("");
+  background-position: center center;
+  background-size: contain;
+  background-repeat: no-repeat;
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+  </style>
+</head>
+<body>
+<canvas id="view"></canvas>
+<div id="shortcut" tabindex=0>
+  <h2>Shortcuts</h2>
+  <h3>→, ↓, k or Space</h3>
+  次へ (next)
+  <h3>←, ↑ or j</h3>
+  前へ (prev)
+  <h3>r</h3>
+  リセット (reset)
+  <h3>t</h3>
+  前フレームを透かせる
+  <h3>z <sup>beta</sup></h3>
+  等倍表示機能
+</div>
+<div id="page-counter">*</div>
+
+<script>
+'use strict';
+(function(){  
+  
+  var page_no = getDefaultPageNo();
+  var page_no_length = FILENAME_RGEX.match(/\{(\d)\}/)[1];
+  var sw_transparent_prev_page = false;
+  var sw_actual_size = false;
+  var v = document.getElementById('view');
+  var vp = document.getElementById('view-prev');  
+  var pc = document.getElementById('page-counter');
+  var ctx = v.getContext('2d');  
+  var view = new Image();
+  
+  function setCanvasSize(){
+    v.setAttribute('width', window.innerWidth + 'px');
+    v.setAttribute('height', window.innerHeight + 'px');  
+  }
+  
+  function getDefaultPageNo(){
+    return parseInt(DEFAULT_BGIMG.match(new RegExp(FILENAME_RGEX))[2]);
+  }  
+  
+  function refreshTransparentPrevFrame(){
+    draw(v, replaceFilename(DEFAULT_BGIMG, page_no - 1), PREVIOUS_FRAME_OPACITY);
+  }
+  
+  function preload(){
+    var img = new Image();
+    img.src = replaceFilename(DEFAULT_BGIMG, page_no + 1);
+  }  
+
+  function pager(e){
+    console.log(e.key);
+    console.log("等倍表示: %s", sw_actual_size);
+    if(e.key !== 'r'){
+        sw_actual_size = false;
+    }
+    
+    switch (e.key){
+      //Prev
+      case 'Left':
+      case 'Up':
+      case 'j':
+        if(page_no <= 0){
+          page_no = 0;
+          return;
+        }
+        page_no -= 1;
+        break;
+      //Next
+      case "Right":
+      case "Down":
+      case 'k':
+      case " ":
+        page_no += 1;
+        break;
+      //Reset
+      case 'r':
+        page_no = getDefaultPageNo();
+        location.hash = '';
+        break;
+      //Transparent Prev Frame
+      case 't':
+        sw_transparent_prev_page = !sw_transparent_prev_page;
+        console.log("前フレーム透過: %s", sw_transparent_prev_page);
+        break;
+      //Actual Size
+      case 'z':
+        sw_actual_size = !sw_actual_size;
+        change();
+        break;
+      default: 
+        return;
+    }
+    location.hash = '#' + page_no; //call change()
+  }  
+
+  function fillZero(no, length){
+    var k = parseInt(length) - String(no).length;
+    var filled = "";
+    if(k < 0) k = 0;
+    while(k > 0){
+      filled += String("0");
+      k -= 1;
+    }
+    filled += String(no);
+    return filled;
+  }
+  
+  function replaceFilename(replacee, target_page_no){
+    var r = replacee.match(new RegExp(FILENAME_RGEX));
+    return r[1] + fillZero(target_page_no, page_no_length) + r[3];
+  }
+  
+  function scaleImage(cw, ch, sw, sh){
+    var d = {};
+    if(!(cw >= sw && ch >= sh)){ //too large
+      var hzoom = ch / sh;
+      var wzoom = cw / sw;
+      var zoom = (hzoom < wzoom) ? hzoom : wzoom;
+      d.zoom = zoom;
+      d.w = sw * zoom;
+      d.h = sh * zoom;
+      d.keepAspect = (sw/sh === d.w/d.h)
+      if(cw < sw){
+        d.x = 0;
+        d.y = (ch - d.h) / 2;
+      }
+      else{
+        d.x = (cw - d.w) / 2;
+        d.y = 0;
+      }
+    }
+    else{ //too small
+      d.w = sw;
+      d.h = sh;
+      d.x = (cw - sw) / 2;
+      d.y = (ch - sh) / 2;
+    }
+    return d;
+  }
+  
+  //note: c = position of cursor
+  function actualSizeImage(cw, ch, sw, sh, cx, cy){
+    var d = {};
+    d.r = (sw - sw * cx / cw) - cw / 2;
+    d.b = (sh - sh * cy / ch) - ch / 2;
+    if(d.r < 0){
+      d.l = cw - sw;
+    }
+    else{
+      d.l = cw / 2 - sw * cx / cw; //d.x
+      d.l = (d.l >= 0) ? 0 : d.l;
+    }
+    if(d.b < 0){
+      d.t = ch - sh;
+    }
+    else{
+      d.t = ch / 2 - sh * cy / ch; //d.y
+      d.t = (d.t >= 0) ? 0 : d.t;
+    }
+    d.w = sw;
+    d.h = sh;
+    return d;
+  }
+  
+  function actualSizeDraw(e, canvas, view){
+    var d = actualSizeImage(
+      canvas.width, canvas.height, view.width, view.height, e.clientX, e.clientY);
+    ctx.drawImage(view, d.l, d.t, d.w, d.h);
+  }  
+  
+  function draw(canvas, source_file, opacity = 1.0){
+    view.src = source_file;
+    view.onload = function(){
+      if(sw_actual_size === true){
+        window.onmousemove = function(e){
+          actualSizeDraw(e, canvas, view);
+        }
+      }
+      else{
+        window.onmousemove = function(){
+          //Do nothing
+        }
+        var d = scaleImage(canvas.width, canvas.height, view.width, view.height);
+        console.log(d);
+        ctx.globalAlpha = opacity;
+        ctx.drawImage(view, d.x, d.y, d.w, d.h);
+      }
+    }
+  }
+  
+  function clearAll(){
+    ctx.clearRect (0, 0, v.width, v.height);
+  }
+  
+  function applyChange(page_no){
+    var new_pic = replaceFilename(DEFAULT_BGIMG, page_no);
+    draw(v, new_pic);
+    pc.textContent = page_no;
+  }
+  
+  function change(){  
+    var hash = location.hash;
+    hash = hash.replace('#', '');
+    if(hash !== ''){
+      page_no = parseInt(hash);
+    }
+    applyChange(page_no);
+    if(sw_transparent_prev_page === true){
+      refreshTransparentPrevFrame();
+    }
+    else if(sw_actual_size === true){
+      applyChange(page_no);
+    }
+    else if(sw_actual_size === false){
+      clearAll();
+      applyChange(page_no);
+    }
+  }  
+  
+  setCanvasSize();
+  console.log("[canvs] width:%s, height:%s", v.width, v.height);
+  window.onresize = setCanvasSize();
+  
+  change();
+  window.addEventListener('keypress', pager);
+  window.onhashchange = function(){
+    change();
+  }  
+})();
+</script>
+</body>
+</html>
