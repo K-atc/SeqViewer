@@ -113,17 +113,17 @@ h1, h2, h3, h4 {
     img.src = replaceFilename(DEFAULT_BGIMG, page_no + 1);
   }  
 
+  function toggle_flag(f){
+    return f ? false : true;
+  }
+
   function pager(e){
     console.log(e.key);
-    console.log("等倍表示: %s", sw_actual_size);
-    if(e.key !== 'r'){
-        sw_actual_size = false;
-    }
     
     switch (e.key){
       //Prev
-      case 'Left':
-      case 'Up':
+      case 'ArrowLeft':
+      case 'ArrowUp':
       case 'j':
         if(page_no <= 0){
           page_no = 0;
@@ -132,14 +132,15 @@ h1, h2, h3, h4 {
         page_no -= 1;
         break;
       //Next
-      case "Right":
-      case "Down":
+      case "ArrowRight":
+      case "ArrowDown":
       case 'k':
       case " ":
         page_no += 1;
         break;
       //Reset
       case 'r':
+        sw_actual_size = false;
         page_no = getDefaultPageNo();
         location.hash = '';
         break;
@@ -147,12 +148,17 @@ h1, h2, h3, h4 {
       case 't':
         sw_transparent_prev_page = !sw_transparent_prev_page;
         console.log("前フレーム透過: %s", sw_transparent_prev_page);
-        break;
+        change();
+        return;
       //Actual Size
       case 'z':
-        sw_actual_size = !sw_actual_size;
+        sw_actual_size = toggle_flag(sw_actual_size);
         change();
-        break;
+        return;
+      case 'Escape':
+        sw_actual_size = false;
+        change();
+        return;
       default: 
         return;
     }
@@ -185,7 +191,7 @@ h1, h2, h3, h4 {
       d.zoom = zoom;
       d.w = sw * zoom;
       d.h = sh * zoom;
-      d.keepAspect = (sw/sh === d.w/d.h)
+      d.keepAspect = (sw/sh === d.w/d.h);
       if(cw < sw){
         d.x = 0;
         d.y = (ch - d.h) / 2;
@@ -237,7 +243,7 @@ h1, h2, h3, h4 {
   function draw(canvas, source_file, opacity = 1.0){
     view.src = source_file;
     view.onload = function(){
-      if(sw_actual_size === true){
+      if(sw_actual_size == true){
         window.onmousemove = function(e){
           actualSizeDraw(e, canvas, view);
         }
@@ -265,22 +271,23 @@ h1, h2, h3, h4 {
   }
   
   function change(){  
+    console.log("等倍表示: %s", sw_actual_size);
     var hash = location.hash;
     hash = hash.replace('#', '');
     if(hash !== ''){
       page_no = parseInt(hash);
     }
-    applyChange(page_no);
-    if(sw_transparent_prev_page === true){
+    else{
+      page_no = getDefaultPageNo();
+    }
+    if(sw_transparent_prev_page == true){
       refreshTransparentPrevFrame();
+      return;
     }
-    else if(sw_actual_size === true){
-      applyChange(page_no);
-    }
-    else if(sw_actual_size === false){
+    if(sw_actual_size == false){
       clearAll();
-      applyChange(page_no);
     }
+    applyChange(page_no);
   }  
   
   setCanvasSize();
