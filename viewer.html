@@ -113,15 +113,19 @@ h1, h2, h3, h4 {
     img.src = replaceFilename(DEFAULT_BGIMG, page_no + 1);
   }  
 
+  function updateHash(new_hash = ""){
+    location.hash = new_hash ? '#' + new_hash : new_hash;
+  }
+
   function toggle_flag(f){
     return f ? false : true;
   }
 
-  function pager(e){
+  function handleKeypress(e){
     console.log(e.key);
     
     switch (e.key){
-      //Prev
+      // Show Prev Image
       case 'ArrowLeft':
       case 'ArrowUp':
       case 'j':
@@ -131,30 +135,31 @@ h1, h2, h3, h4 {
         }
         page_no -= 1;
         break;
-      //Next
-      case "ArrowRight":
-      case "ArrowDown":
+      // Show Next Image
+      case 'ArrowRight':
+      case 'ArrowDown':
       case 'k':
-      case " ":
+      case ' ':
         page_no += 1;
         break;
-      //Reset
+      // Reset
       case 'r':
         sw_actual_size = false;
         page_no = getDefaultPageNo();
-        location.hash = '';
+        updateHash();
         break;
-      //Transparent Prev Frame
+      // Transparent Prev Frame
       case 't':
         sw_transparent_prev_page = !sw_transparent_prev_page;
         console.log("前フレーム透過: %s", sw_transparent_prev_page);
         change();
         return;
-      //Actual Size
+      // Actual Size
       case 'z':
         sw_actual_size = toggle_flag(sw_actual_size);
         change();
         return;
+      // Disable Functions
       case 'Escape':
         sw_actual_size = false;
         change();
@@ -162,9 +167,11 @@ h1, h2, h3, h4 {
       default: 
         return;
     }
-    location.hash = '#' + page_no; //call change()
+    updateHash(page_no); // to call change()
   }  
 
+  // @arg no : int (or string)
+  // @arg length : int (or string)
   function fillZero(no, length){
     var k = parseInt(length) - String(no).length;
     var filled = "";
@@ -181,10 +188,15 @@ h1, h2, h3, h4 {
     var r = replacee.match(new RegExp(FILENAME_RGEX));
     return r[1] + fillZero(target_page_no, page_no_length) + r[3];
   }
-  
+ 
+  // Note: `cx` is x of canvas, and `sx` is x of view
+  // @return d = {
+  //               x, y : float <- top left draw position of image
+  //               w, h : float <- draw size of image
+  //             }
   function scaleImage(cw, ch, sw, sh){
     var d = {};
-    if(!(cw >= sw && ch >= sh)){ //too large
+    if(!(cw >= sw && ch >= sh)){ // canvas is too large
       var hzoom = ch / sh;
       var wzoom = cw / sw;
       var zoom = (hzoom < wzoom) ? hzoom : wzoom;
@@ -201,7 +213,7 @@ h1, h2, h3, h4 {
         d.y = 0;
       }
     }
-    else{ //too small
+    else{ // canvas is too small
       d.w = sw;
       d.h = sh;
       d.x = (cw - sw) / 2;
@@ -259,6 +271,10 @@ h1, h2, h3, h4 {
       }
     }
   }
+
+  function getHash(){
+    return location.hash.replace('#', '');
+  }
   
   function clearAll(){
     ctx.clearRect (0, 0, v.width, v.height);
@@ -270,10 +286,10 @@ h1, h2, h3, h4 {
     pc.textContent = page_no;
   }
   
+  // Note: Event driven function (expect function calls to apply new state)
   function change(){  
     console.log("等倍表示: %s", sw_actual_size);
-    var hash = location.hash;
-    hash = hash.replace('#', '');
+    var hash = getHash();
     if(hash !== ''){
       page_no = parseInt(hash);
     }
@@ -288,17 +304,21 @@ h1, h2, h3, h4 {
       clearAll();
     }
     applyChange(page_no);
-  }  
-  
-  setCanvasSize();
-  console.log("[canvs] width:%s, height:%s", v.width, v.height);
-  window.onresize = setCanvasSize();
-  
-  change();
-  window.addEventListener('keypress', pager);
-  window.onhashchange = function(){
+  } 
+
+  function initView(){
+    setCanvasSize();
+    console.log("[canvs] width:%s, height:%s", v.width, v.height);
     change();
-  }  
+  } 
+  
+  initView();
+
+  window.onresize = setCanvasSize();
+  window.addEventListener('keypress', handleKeypress);
+  window.onhashchange = function() {
+      change();  
+  }
 })();
 </script>
 </body>
